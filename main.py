@@ -478,6 +478,10 @@ class SnapForge:
         if self.overlay:
             self.overlay.deleteLater()
             self.overlay = None
+
+        # Kırpılan görüntüyü hemen clipboard'a kopyala
+        QApplication.clipboard().setPixmap(pixmap)
+
         self.editor = AnnotationEditor(
             pixmap, get_save_dir(), self.tray,
             on_delayed=self._start_delayed,

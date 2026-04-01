@@ -368,12 +368,13 @@ class TextInputPanel(QFrame):
         ann = self.get_preview_annotation()
         if ann:
             self.canvas.annotations.append(ann)
-            # Ana canvas ayarlarını güncelle
             self.canvas.pen_color = self.color
             self.canvas.text_bg_color = self.bg_color
             self.canvas.font_size = self.font_size
         self.canvas.text_panel = None
         self.canvas.update()
+        if ann:
+            self.canvas._sync_clipboard()
         self.deleteLater()
 
     def cancel(self):
@@ -735,6 +736,7 @@ class AnnotationCanvas(QWidget):
             self.resize_fixed = None
             self._update_select_cursor(self._to_image(event.pos()))
             self.update()
+            self._sync_clipboard()
             return
 
         if not self.drawing:
@@ -766,6 +768,7 @@ class AnnotationCanvas(QWidget):
                     "text": "",
                 })
         self.update()
+        self._sync_clipboard()
 
     def mouseDoubleClickEvent(self, event):
         """Seç modunda metin'e çift tıkla → düzenle."""
@@ -821,16 +824,30 @@ class AnnotationCanvas(QWidget):
             self.annotations.pop(self.selected_index)
             self.selected_index = -1
             self.update()
+            self._sync_clipboard()
             return
         if self.annotations:
             self.annotations.pop()
             self.update()
+            self._sync_clipboard()
 
     def delete_selected(self):
         if 0 <= self.selected_index < len(self.annotations):
             self.annotations.pop(self.selected_index)
             self.selected_index = -1
             self.update()
+            self._sync_clipboard()
+
+    def _sync_clipboard(self):
+        """Her değişiklikte clipboard'ı güncelle."""
+        from PyQt5.QtWidgets import QApplication
+        result = QPixmap(self.base)
+        p = QPainter(result)
+        p.setRenderHint(QPainter.Antialiasing)
+        for ann in self.annotations:
+            _draw(p, ann, self.base)
+        p.end()
+        QApplication.clipboard().setPixmap(result)
 
     def render_final(self):
         self.commit_pending_text()
@@ -1347,6 +1364,13 @@ class AnnotationEditor(QMainWindow):
         self._ensure_saved()
         if self.saved_path and self.saved_path.exists():
             subprocess.Popen(["explorer", "/select,", str(self.saved_path)])
+
+    def closeEvent(self, event):
+        # Kapanırken güncel halini clipboard'a kopyala
+        from PyQt5.QtWidgets import QApplication
+        final = self.canvas.render_final()
+        QApplication.clipboard().setPixmap(final)
+        super().closeEvent(event)
 
     def keyPressEvent(self, event):
         if event.key() == Qt.Key_Escape:
