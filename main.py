@@ -15,7 +15,6 @@ from config import get_save_dir, set_save_dir
 from editor import AnnotationEditor
 
 
-HOTKEY_LABEL = "Ctrl+Shift+S"
 DELAY_SECONDS = 3
 
 # Windows hotkey sabitleri
@@ -23,7 +22,10 @@ WM_HOTKEY = 0x0312
 MOD_CONTROL = 0x0002
 MOD_SHIFT = 0x0004
 MOD_NOREPEAT = 0x4000
-HOTKEY_ID_CAPTURE = 1
+VK_SNAPSHOT = 0x2C
+HOTKEY_ID_CAPTURE = 1      # Ctrl+Shift+S
+HOTKEY_ID_PRTSCN = 2       # Print Screen
+HOTKEY_ID_DELAYED = 3      # Ctrl+Shift+D
 
 
 # ---------------------------------------------------------------------------
@@ -33,17 +35,22 @@ HOTKEY_ID_CAPTURE = 1
 class GlobalHotkeyFilter(QAbstractNativeEventFilter):
     """Windows WM_HOTKEY mesajlarını yakalayan native event filtresi."""
 
-    def __init__(self, callback):
+    def __init__(self, on_capture, on_delayed):
         super().__init__()
-        self.callback = callback
+        self.on_capture = on_capture
+        self.on_delayed = on_delayed
 
     def nativeEventFilter(self, eventType, message):
         try:
             if eventType == b"windows_generic_MSG":
                 msg = wintypes.MSG.from_address(int(message))
-                if msg.message == WM_HOTKEY and msg.wParam == HOTKEY_ID_CAPTURE:
-                    self.callback()
-                    return True, 0
+                if msg.message == WM_HOTKEY:
+                    if msg.wParam in (HOTKEY_ID_CAPTURE, HOTKEY_ID_PRTSCN):
+                        self.on_capture()
+                        return True, 0
+                    elif msg.wParam == HOTKEY_ID_DELAYED:
+                        self.on_delayed()
+                        return True, 0
         except Exception:
             pass
         return False, 0
@@ -54,7 +61,7 @@ class GlobalHotkeyFilter(QAbstractNativeEventFilter):
 # ---------------------------------------------------------------------------
 
 class ScreenshotOverlay(QWidget):
-    def __init__(self, on_capture):
+    def __init__(self, on_capture, pre_captured_bg=None):
         super().__init__()
         self.on_capture = on_capture
         self.origin = None
@@ -70,7 +77,9 @@ class ScreenshotOverlay(QWidget):
         screen = QApplication.primaryScreen()
         vg = screen.virtualGeometry()
         self.setGeometry(vg)
-        self.bg = screen.grabWindow(0, vg.x(), vg.y(), vg.width(), vg.height())
+        self.bg = pre_captured_bg if pre_captured_bg else screen.grabWindow(
+            0, vg.x(), vg.y(), vg.width(), vg.height()
+        )
 
     def showEvent(self, event):
         super().showEvent(event)
@@ -135,19 +144,29 @@ class ScreenshotOverlay(QWidget):
 # ---------------------------------------------------------------------------
 
 class CountdownOverlay(QWidget):
+    """Küçük yüzen sayaç — ekranı kapatmaz, mouse/klavye geçirir."""
+
     def __init__(self, seconds, on_done):
         super().__init__()
         self.remaining = seconds
         self.on_done = on_done
 
         self.setWindowFlags(
-            Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.Tool
+            Qt.FramelessWindowHint
+            | Qt.WindowStaysOnTopHint
+            | Qt.Tool
+            | Qt.WindowTransparentForInput  # Mouse/klavye olaylarını geçir
         )
         self.setAttribute(Qt.WA_TranslucentBackground)
 
-        screen = QApplication.primaryScreen()
-        vg = screen.virtualGeometry()
-        self.setGeometry(vg)
+        # Küçük sayaç — ekranın ortasında
+        size = 120
+        screen = QApplication.primaryScreen().availableGeometry()
+        self.setFixedSize(size, size)
+        self.move(
+            screen.x() + (screen.width() - size) // 2,
+            screen.y() + (screen.height() - size) // 2,
+        )
 
         self.timer = QTimer()
         self.timer.timeout.connect(self._tick)
@@ -166,9 +185,14 @@ class CountdownOverlay(QWidget):
 
     def paintEvent(self, _e):
         p = QPainter(self)
-        p.fillRect(self.rect(), QColor(0, 0, 0, 120))
+        p.setRenderHint(QPainter.Antialiasing)
+        # Yarı saydam koyu daire
+        p.setPen(Qt.NoPen)
+        p.setBrush(QColor(0, 0, 0, 180))
+        p.drawEllipse(self.rect().adjusted(4, 4, -4, -4))
+        # Sayı
         p.setPen(QColor(255, 255, 255))
-        p.setFont(QFont("Segoe UI", 140, QFont.Bold))
+        p.setFont(QFont("Segoe UI", 48, QFont.Bold))
         p.drawText(self.rect(), Qt.AlignCenter, str(self.remaining))
 
 
@@ -340,7 +364,7 @@ class SnapForge:
         self.app_icon = _create_app_icon()
         self.app.setWindowIcon(self.app_icon)
         self.tray.setIcon(self.app_icon)
-        self.tray.setToolTip(f"SnapForge ({HOTKEY_LABEL})")
+        self.tray.setToolTip("SnapForge (Ctrl+Shift+S | Ctrl+Shift+D gecikmeli)")
 
         menu = QMenu()
         menu.addAction("Ekran Görüntüsü Al", self._start_capture)
@@ -358,31 +382,47 @@ class SnapForge:
 
         self.tray.showMessage(
             "SnapForge",
-            f"Hazır. {HOTKEY_LABEL} ile ekran görüntüsü al.",
+            "Hazır.\nCtrl+Shift+S → çekim\nCtrl+Shift+D → gecikmeli çekim",
             QSystemTrayIcon.Information,
             2000,
         )
 
     def _setup_hotkey(self):
-        # Önceki crash'ten kalan kaydı temizle
+        # Önceki crash'ten kalan kayıtları temizle
         ctypes.windll.user32.UnregisterHotKey(None, HOTKEY_ID_CAPTURE)
+        ctypes.windll.user32.UnregisterHotKey(None, HOTKEY_ID_PRTSCN)
 
-        # Windows RegisterHotKey API — sistem genelinde garanti çalışır
-        result = ctypes.windll.user32.RegisterHotKey(
+        # Ctrl+Shift+S
+        ctypes.windll.user32.RegisterHotKey(
             None, HOTKEY_ID_CAPTURE,
             MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT,
             ord("S"),
         )
-        if not result:
+
+        # Print Screen — tooltip'leri kaçırmaz
+        prtscn_ok = ctypes.windll.user32.RegisterHotKey(
+            None, HOTKEY_ID_PRTSCN,
+            MOD_NOREPEAT,
+            VK_SNAPSHOT,
+        )
+        if not prtscn_ok:
             self.tray.showMessage(
                 "SnapForge",
-                f"{HOTKEY_LABEL} kaydedilemedi — başka uygulama kullanıyor olabilir.",
+                "Print Screen kaydedilemedi.\n"
+                "Ayarlar > Erişilebilirlik > Klavye > 'Print Screen tuşuyla Ekran Alıntısı Aracı aç' kapatın.",
                 QSystemTrayIcon.Warning,
-                3000,
+                5000,
             )
-            return
 
-        self._hotkey_filter = GlobalHotkeyFilter(self._start_capture)
+        # Ctrl+Shift+D — gecikmeli çekim (tooltip modu)
+        ctypes.windll.user32.UnregisterHotKey(None, HOTKEY_ID_DELAYED)
+        ctypes.windll.user32.RegisterHotKey(
+            None, HOTKEY_ID_DELAYED,
+            MOD_CONTROL | MOD_SHIFT | MOD_NOREPEAT,
+            ord("D"),
+        )
+
+        self._hotkey_filter = GlobalHotkeyFilter(self._start_capture, self._start_delayed)
         self.app.installNativeEventFilter(self._hotkey_filter)
 
     def _on_tray_click(self, reason):
@@ -392,11 +432,21 @@ class SnapForge:
     # -- Çekim modları --
 
     def _start_capture(self):
+        # Editor açıksa öne getir
         if self.editor and self.editor.isVisible():
+            self.editor.raise_()
+            self.editor.activateWindow()
             return
         if self.overlay and self.overlay.isVisible():
             return
-        QTimer.singleShot(150, self._show_overlay)
+        if self.countdown and self.countdown.isVisible():
+            return
+
+        # Ekranı HEMEN yakala
+        screen = QApplication.primaryScreen()
+        vg = screen.virtualGeometry()
+        self._pre_bg = screen.grabWindow(0, vg.x(), vg.y(), vg.width(), vg.height())
+        QTimer.singleShot(50, self._show_overlay)
 
     def _show_overlay(self):
         if self.overlay:
@@ -405,7 +455,8 @@ class SnapForge:
         if self.editor:
             self.editor.deleteLater()
             self.editor = None
-        self.overlay = ScreenshotOverlay(self._open_editor)
+        self.overlay = ScreenshotOverlay(self._open_editor, self._pre_bg)
+        self._pre_bg = None
         self.overlay.show()
 
     def _start_delayed(self):
@@ -415,7 +466,11 @@ class SnapForge:
         self.countdown.show()
 
     def _delayed_capture(self):
-        QTimer.singleShot(100, self._show_overlay)
+        # Geri sayım bitti — ekranı şimdi yakala (tooltip'ler görünür)
+        screen = QApplication.primaryScreen()
+        vg = screen.virtualGeometry()
+        self._pre_bg = screen.grabWindow(0, vg.x(), vg.y(), vg.width(), vg.height())
+        QTimer.singleShot(50, self._show_overlay)
 
     # -- Editör --
 
@@ -423,8 +478,20 @@ class SnapForge:
         if self.overlay:
             self.overlay.deleteLater()
             self.overlay = None
-        self.editor = AnnotationEditor(pixmap, get_save_dir(), self.tray, on_delayed=self._start_delayed)
+        self.editor = AnnotationEditor(
+            pixmap, get_save_dir(), self.tray,
+            on_delayed=self._start_delayed,
+            on_new=self._new_capture,
+        )
         self.editor.show()
+
+    def _new_capture(self):
+        """Editörü kapat, yeni çekim başlat."""
+        if self.editor:
+            self.editor.close()
+            self.editor.deleteLater()
+            self.editor = None
+        QTimer.singleShot(200, self._show_overlay)
 
     # -- Galeri --
 
@@ -452,6 +519,8 @@ class SnapForge:
 
     def _quit(self):
         ctypes.windll.user32.UnregisterHotKey(None, HOTKEY_ID_CAPTURE)
+        ctypes.windll.user32.UnregisterHotKey(None, HOTKEY_ID_PRTSCN)
+        ctypes.windll.user32.UnregisterHotKey(None, HOTKEY_ID_DELAYED)
         self.app.quit()
 
     def run(self):

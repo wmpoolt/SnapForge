@@ -151,6 +151,22 @@ def icon_undo():
     return _icon(draw)
 
 
+def icon_new():
+    def draw(p, s):
+        pen = QPen(QColor(220, 220, 220), 1.8, Qt.SolidLine, Qt.RoundCap)
+        p.setPen(pen)
+        # Kare çerçeve
+        p.setBrush(Qt.NoBrush)
+        p.drawRect(int(s * 0.2), int(s * 0.2), int(s * 0.55), int(s * 0.6))
+        # Artı işareti
+        cx, cy = s * 0.7, s * 0.3
+        arm = s * 0.12
+        p.setPen(QPen(QColor(100, 220, 100), 2.5, Qt.SolidLine, Qt.RoundCap))
+        p.drawLine(int(cx - arm), int(cy), int(cx + arm), int(cy))
+        p.drawLine(int(cx), int(cy - arm), int(cx), int(cy + arm))
+    return _icon(draw)
+
+
 def icon_timer():
     def draw(p, s):
         pen = QPen(QColor(220, 220, 220), 1.8)
@@ -1119,11 +1135,12 @@ def _apply_dark_titlebar(hwnd):
 
 
 class AnnotationEditor(QMainWindow):
-    def __init__(self, pixmap, save_dir, tray=None, on_delayed=None):
+    def __init__(self, pixmap, save_dir, tray=None, on_delayed=None, on_new=None):
         super().__init__()
         self.save_dir = Path(save_dir)
         self.tray = tray
         self.on_delayed = on_delayed
+        self.on_new = on_new
         self.saved_path = None
 
         self.setWindowTitle("SnapForge")
@@ -1164,6 +1181,15 @@ class AnnotationEditor(QMainWindow):
         tb.setToolButtonStyle(Qt.ToolButtonIconOnly)
         tb.setStyleSheet(TOOLBAR_STYLE)
         self.addToolBar(tb)
+
+        # Yeni çekim — en başta
+        if self.on_new:
+            new_action = QAction(icon_new(), "Yeni Çekim", self)
+            new_action.setToolTip("Yeni çekim (Ctrl+N)")
+            new_action.setShortcut("Ctrl+N")
+            new_action.triggered.connect(self._trigger_new)
+            tb.addAction(new_action)
+            tb.addSeparator()
 
         group = QActionGroup(self)
         tools = [
@@ -1225,6 +1251,11 @@ class AnnotationEditor(QMainWindow):
             delay_action.setToolTip("3 saniye sonra yeni çekim")
             delay_action.triggered.connect(self._trigger_delayed)
             tb.addAction(delay_action)
+
+    def _trigger_new(self):
+        self.close()
+        if self.on_new:
+            self.on_new()
 
     def _trigger_delayed(self):
         self.close()
