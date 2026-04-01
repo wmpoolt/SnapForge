@@ -406,13 +406,13 @@ class SnapForge:
             self.editor.deleteLater()
             self.editor = None
         self.overlay = ScreenshotOverlay(self._open_editor)
-        self.overlay.showFullScreen()
+        self.overlay.show()
 
     def _start_delayed(self):
         if self.countdown:
             self.countdown.deleteLater()
         self.countdown = CountdownOverlay(DELAY_SECONDS, self._delayed_capture)
-        self.countdown.showFullScreen()
+        self.countdown.show()
 
     def _delayed_capture(self):
         QTimer.singleShot(100, self._show_overlay)
