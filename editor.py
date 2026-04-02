@@ -7,6 +7,7 @@ from PyQt5.QtWidgets import (
     QMainWindow, QWidget, QToolBar, QAction, QActionGroup,
     QColorDialog, QLineEdit, QHBoxLayout, QVBoxLayout, QPushButton,
     QFrame, QLabel, QComboBox, QGraphicsDropShadowEffect, QSizePolicy,
+    QToolButton, QMenu,
 )
 from PyQt5.QtCore import Qt, QRect, QPoint, QTimer, QSize
 from PyQt5.QtGui import (
@@ -31,121 +32,151 @@ def _icon(draw_func, size=24):
 
 
 def icon_select():
+    """Seç: klasik mouse imleci (pointer)"""
     def draw(p, s):
-        pen = QPen(QColor(220, 220, 220), 1.8, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-        p.setPen(pen)
-        p.setBrush(QBrush(QColor(220, 220, 220)))
+        w = QColor(220, 220, 220)
+        p.setPen(QPen(QColor(80, 80, 80), 1.2))
+        p.setBrush(QBrush(w))
         path = QPainterPath()
-        path.moveTo(s * 0.2, s * 0.15)
-        path.lineTo(s * 0.2, s * 0.7)
-        path.lineTo(s * 0.38, s * 0.55)
-        path.lineTo(s * 0.55, s * 0.8)
-        path.lineTo(s * 0.65, s * 0.72)
-        path.lineTo(s * 0.48, s * 0.48)
-        path.lineTo(s * 0.7, s * 0.45)
+        path.moveTo(s * 0.22, s * 0.1)
+        path.lineTo(s * 0.22, s * 0.78)
+        path.lineTo(s * 0.42, s * 0.6)
+        path.lineTo(s * 0.62, s * 0.88)
+        path.lineTo(s * 0.72, s * 0.8)
+        path.lineTo(s * 0.52, s * 0.52)
+        path.lineTo(s * 0.76, s * 0.48)
         path.closeSubpath()
         p.drawPath(path)
     return _icon(draw)
 
 
 def icon_pen():
+    """Kalem: eğimli kalem gövdesi + uç"""
     def draw(p, s):
-        pen = QPen(QColor(220, 220, 220), 2, Qt.SolidLine, Qt.RoundCap)
-        p.setPen(pen)
-        # Kalem gövdesi
-        p.drawLine(int(s * 0.25), int(s * 0.75), int(s * 0.7), int(s * 0.3))
-        # Ucu
-        p.setBrush(QBrush(QColor(220, 220, 220)))
-        p.drawEllipse(int(s * 0.18), int(s * 0.74), int(s * 0.1), int(s * 0.1))
-        # Kalem üst
-        p.drawLine(int(s * 0.7), int(s * 0.3), int(s * 0.78), int(s * 0.18))
+        w = QColor(220, 220, 220)
+        # Kalem gövdesi (eğik dikdörtgen)
+        p.setPen(Qt.NoPen)
+        p.setBrush(QBrush(w))
+        path = QPainterPath()
+        path.moveTo(s * 0.62, s * 0.12)
+        path.lineTo(s * 0.82, s * 0.32)
+        path.lineTo(s * 0.32, s * 0.82)
+        path.lineTo(s * 0.12, s * 0.62)
+        path.closeSubpath()
+        p.drawPath(path)
+        # Uç (koyu üçgen)
+        p.setBrush(QBrush(QColor(100, 100, 100)))
+        tip = QPainterPath()
+        tip.moveTo(s * 0.12, s * 0.62)
+        tip.lineTo(s * 0.32, s * 0.82)
+        tip.lineTo(s * 0.08, s * 0.92)
+        tip.closeSubpath()
+        p.drawPath(tip)
     return _icon(draw)
 
 
 def icon_arrow():
+    """Ok: çizgi + ok ucu"""
     def draw(p, s):
-        pen = QPen(QColor(220, 220, 220), 2, Qt.SolidLine, Qt.RoundCap)
-        p.setPen(pen)
-        p.drawLine(int(s * 0.2), int(s * 0.8), int(s * 0.7), int(s * 0.25))
+        w = QColor(220, 220, 220)
+        p.setPen(QPen(w, 2.2, Qt.SolidLine, Qt.RoundCap))
+        p.drawLine(int(s * 0.18), int(s * 0.82), int(s * 0.72), int(s * 0.28))
         # Ok ucu
-        p.setBrush(QBrush(QColor(220, 220, 220)))
+        p.setBrush(QBrush(w))
         p.setPen(Qt.NoPen)
         poly = QPolygon([
-            QPoint(int(s * 0.75), int(s * 0.18)),
-            QPoint(int(s * 0.55), int(s * 0.28)),
-            QPoint(int(s * 0.68), int(s * 0.42)),
+            QPoint(int(s * 0.82), int(s * 0.18)),
+            QPoint(int(s * 0.56), int(s * 0.26)),
+            QPoint(int(s * 0.74), int(s * 0.44)),
         ])
         p.drawPolygon(poly)
     return _icon(draw)
 
 
 def icon_rect():
+    """Dikdörtgen: yuvarlatılmış köşeli çerçeve"""
     def draw(p, s):
-        pen = QPen(QColor(220, 220, 220), 2)
-        p.setPen(pen)
+        p.setPen(QPen(QColor(220, 220, 220), 2))
         p.setBrush(Qt.NoBrush)
-        p.drawRect(int(s * 0.18), int(s * 0.22), int(s * 0.64), int(s * 0.56))
+        p.drawRoundedRect(int(s * 0.15), int(s * 0.2), int(s * 0.7), int(s * 0.6), 3, 3)
     return _icon(draw)
 
 
 def icon_text():
+    """Yazı: kalın T harfi + altı çizili"""
     def draw(p, s):
         p.setPen(QColor(220, 220, 220))
-        f = QFont("Segoe UI", int(s * 0.55), QFont.Bold)
+        f = QFont("Segoe UI", int(s * 0.5), QFont.Bold)
         p.setFont(f)
-        p.drawText(QRect(0, 0, s, s), Qt.AlignCenter, "T")
+        p.drawText(QRect(0, int(-s * 0.04), s, s), Qt.AlignCenter, "T")
+        # Alt çizgi
+        p.setPen(QPen(QColor(0, 120, 215), 2))
+        p.drawLine(int(s * 0.25), int(s * 0.78), int(s * 0.75), int(s * 0.78))
     return _icon(draw)
 
 
 def icon_blur():
+    """Bulanıklaştır: damla/su damlası ikonu"""
     def draw(p, s):
-        # Mozaik grid
-        p.setPen(Qt.NoPen)
-        colors = [QColor(180, 180, 180), QColor(120, 120, 120)]
-        cell = s * 0.18
-        for row in range(3):
-            for col in range(3):
-                c = colors[(row + col) % 2]
-                p.setBrush(c)
-                x = s * 0.16 + col * cell
-                y = s * 0.16 + row * cell
-                p.drawRect(int(x), int(y), int(cell - 1), int(cell - 1))
+        w = QColor(200, 200, 200)
+        p.setPen(QPen(w, 1.8))
+        p.setBrush(Qt.NoBrush)
+        # Damla şekli
+        path = QPainterPath()
+        cx = s * 0.5
+        path.moveTo(cx, s * 0.12)
+        path.cubicTo(cx - s * 0.3, s * 0.5, cx - s * 0.28, s * 0.75, cx, s * 0.88)
+        path.cubicTo(cx + s * 0.28, s * 0.75, cx + s * 0.3, s * 0.5, cx, s * 0.12)
+        p.drawPath(path)
+        # İç dalgalar (blur etkisi)
+        p.setPen(QPen(QColor(160, 160, 160), 1))
+        p.drawLine(int(s * 0.35), int(s * 0.55), int(s * 0.65), int(s * 0.55))
+        p.drawLine(int(s * 0.32), int(s * 0.65), int(s * 0.68), int(s * 0.65))
+        p.drawLine(int(s * 0.38), int(s * 0.75), int(s * 0.62), int(s * 0.75))
     return _icon(draw)
 
 
 def icon_color():
+    """Renk: palette/gökkuşağı daire"""
     def draw(p, s):
-        p.setPen(QPen(QColor(180, 180, 180), 1.5))
-        p.setBrush(QBrush(QColor(255, 60, 60)))
-        p.drawEllipse(int(s * 0.2), int(s * 0.2), int(s * 0.6), int(s * 0.6))
-    return _icon(draw)
-
-
-def icon_delete():
-    def draw(p, s):
-        pen = QPen(QColor(240, 80, 80), 2.5, Qt.SolidLine, Qt.RoundCap)
-        p.setPen(pen)
-        p.drawLine(int(s * 0.25), int(s * 0.25), int(s * 0.75), int(s * 0.75))
-        p.drawLine(int(s * 0.75), int(s * 0.25), int(s * 0.25), int(s * 0.75))
+        cx, cy = s * 0.5, s * 0.5
+        r = s * 0.32
+        # Renkli pasta dilimler
+        colors = [
+            QColor(255, 60, 60),    # kırmızı
+            QColor(255, 180, 0),    # turuncu
+            QColor(80, 200, 80),    # yeşil
+            QColor(60, 140, 255),   # mavi
+        ]
+        for i, c in enumerate(colors):
+            p.setPen(Qt.NoPen)
+            p.setBrush(QBrush(c))
+            p.drawPie(int(cx - r), int(cy - r), int(r * 2), int(r * 2),
+                       i * 90 * 16, 90 * 16)
+        # Ortada beyaz nokta
+        p.setBrush(QBrush(QColor(40, 40, 40)))
+        p.drawEllipse(int(cx - r * 0.3), int(cy - r * 0.3), int(r * 0.6), int(r * 0.6))
     return _icon(draw)
 
 
 def icon_undo():
+    """Geri al: geri dönen ok"""
     def draw(p, s):
-        pen = QPen(QColor(220, 220, 220), 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin)
-        p.setPen(pen)
+        w = QColor(220, 220, 220)
+        p.setPen(QPen(w, 2, Qt.SolidLine, Qt.RoundCap, Qt.RoundJoin))
         p.setBrush(Qt.NoBrush)
+        # Yay
         path = QPainterPath()
-        path.moveTo(s * 0.65, s * 0.3)
-        path.cubicTo(s * 0.75, s * 0.5, s * 0.65, s * 0.75, s * 0.35, s * 0.65)
+        path.moveTo(s * 0.3, s * 0.35)
+        path.cubicTo(s * 0.55, s * 0.15, s * 0.85, s * 0.35, s * 0.7, s * 0.7)
         p.drawPath(path)
-        # Ok ucu
-        p.setBrush(QBrush(QColor(220, 220, 220)))
+        # Sol ok ucu
+        p.setBrush(QBrush(w))
         p.setPen(Qt.NoPen)
         poly = QPolygon([
-            QPoint(int(s * 0.28), int(s * 0.6)),
-            QPoint(int(s * 0.38), int(s * 0.72)),
-            QPoint(int(s * 0.42), int(s * 0.55)),
+            QPoint(int(s * 0.18), int(s * 0.35)),
+            QPoint(int(s * 0.35), int(s * 0.2)),
+            QPoint(int(s * 0.35), int(s * 0.5)),
         ])
         p.drawPolygon(poly)
     return _icon(draw)
@@ -409,7 +440,7 @@ class AnnotationCanvas(QWidget):
         super().__init__(parent)
         self.base = pixmap
         self.annotations = []
-        self.current_tool = "select"
+        self.current_tool = "pen"
         self.pen_color = QColor(255, 40, 40)
         self.text_bg_color = None
         self.font_size = 18
@@ -1117,17 +1148,15 @@ TOOLBAR_STYLE = """
         background: #1e1e1e;
         border: none;
         border-bottom: 1px solid #333;
-        spacing: 2px;
-        padding: 4px;
+        spacing: 1px;
+        padding: 3px;
     }
     QToolButton {
         color: #ccc;
         background: transparent;
         border: none;
-        border-radius: 6px;
-        padding: 8px 10px;
-        font-size: 12px;
-        font-family: 'Segoe UI';
+        border-radius: 5px;
+        padding: 6px 8px;
     }
     QToolButton:hover {
         background: rgba(255, 255, 255, 0.1);
@@ -1136,6 +1165,10 @@ TOOLBAR_STYLE = """
     QToolButton:checked {
         background: #0078d7;
         color: white;
+    }
+    QToolButton::menu-indicator {
+        image: none;
+        width: 0px;
     }
 """
 
@@ -1194,28 +1227,36 @@ class AnnotationEditor(QMainWindow):
     def _build_toolbar(self):
         tb = QToolBar("Araçlar")
         tb.setMovable(False)
-        tb.setIconSize(QSize(22, 22))
+        tb.setIconSize(QSize(20, 20))
         tb.setToolButtonStyle(Qt.ToolButtonIconOnly)
         tb.setStyleSheet(TOOLBAR_STYLE)
         self.addToolBar(tb)
 
-        # Yeni çekim — en başta
+        # -- Sol: Yeni çekim + Gecikmeli --
         if self.on_new:
             new_action = QAction(icon_new(), "Yeni Çekim", self)
             new_action.setToolTip("Yeni çekim (Ctrl+N)")
             new_action.setShortcut("Ctrl+N")
             new_action.triggered.connect(self._trigger_new)
             tb.addAction(new_action)
-            tb.addSeparator()
 
+        if self.on_delayed:
+            delay_action = QAction(icon_timer(), "Gecikmeli Çekim", self)
+            delay_action.setToolTip("Gecikmeli çekim (Ctrl+Shift+D)")
+            delay_action.triggered.connect(self._trigger_delayed)
+            tb.addAction(delay_action)
+
+        tb.addSeparator()
+
+        # -- Çizim araçları --
         group = QActionGroup(self)
         tools = [
-            ("Seç", "select", icon_select()),
             ("Kalem", "pen", icon_pen()),
             ("Ok", "arrow", icon_arrow()),
             ("Dikdörtgen", "rectangle", icon_rect()),
             ("Yazı", "text", icon_text()),
             ("Bulanıklaştır", "blur", icon_blur()),
+            ("Seç", "select", icon_select()),
         ]
         for label, tool_id, ico in tools:
             action = QAction(ico, label, self)
@@ -1224,50 +1265,43 @@ class AnnotationEditor(QMainWindow):
             action.triggered.connect(lambda checked, t=tool_id: self._set_tool(t))
             group.addAction(action)
             tb.addAction(action)
-            if tool_id == "select":
+            if tool_id == "pen":
                 action.setChecked(True)
 
         tb.addSeparator()
 
-        # Renk
+        # -- Renk + Kalınlık (tek dropdown) --
         self.color_action = QAction(icon_color(), "Renk", self)
-        self.color_action.setToolTip("Renk")
+        self.color_action.setToolTip("Renk seç")
         self.color_action.triggered.connect(self._pick_color)
         tb.addAction(self.color_action)
 
-        tb.addSeparator()
-
-        # Kalınlık
-        for w in (2, 4, 6):
-            a = QAction(icon_width(w), f"{w}px", self)
-            a.setToolTip(f"Kalınlık {w}px")
+        width_btn = QToolButton()
+        width_btn.setIcon(icon_width(3))
+        width_btn.setToolTip("Kalınlık")
+        width_btn.setPopupMode(QToolButton.InstantPopup)
+        width_menu = QMenu(width_btn)
+        width_menu.setStyleSheet("QMenu { background: #2b2b2b; color: #ddd; } QMenu::item:selected { background: #0078d7; }")
+        for w in (1, 2, 4, 6, 8):
+            a = width_menu.addAction(icon_width(w), f"{w}px")
             a.triggered.connect(lambda checked, pw=w: self._set_width(pw))
-            tb.addAction(a)
+        width_btn.setMenu(width_menu)
+        tb.addWidget(width_btn)
 
         tb.addSeparator()
 
-        # Sil
-        delete_action = QAction(icon_delete(), "Sil", self)
-        delete_action.setShortcut("Delete")
-        delete_action.setToolTip("Seçili öğeyi sil (Delete)")
-        delete_action.triggered.connect(self.canvas.delete_selected)
-        tb.addAction(delete_action)
-
-        # Geri al
+        # -- Geri al --
         undo_action = QAction(icon_undo(), "Geri Al", self)
         undo_action.setShortcut("Ctrl+Z")
         undo_action.setToolTip("Geri al (Ctrl+Z)")
         undo_action.triggered.connect(self.canvas.undo)
         tb.addAction(undo_action)
 
-        tb.addSeparator()
-
-        # Gecikmeli çekim
-        if self.on_delayed:
-            delay_action = QAction(icon_timer(), "Gecikmeli Çekim", self)
-            delay_action.setToolTip("3 saniye sonra yeni çekim")
-            delay_action.triggered.connect(self._trigger_delayed)
-            tb.addAction(delay_action)
+        # Delete kısayolu (toolbar'da görünmez)
+        delete_action = QAction(self)
+        delete_action.setShortcut("Delete")
+        delete_action.triggered.connect(self.canvas.delete_selected)
+        self.addAction(delete_action)
 
     def _trigger_new(self):
         self.close()
